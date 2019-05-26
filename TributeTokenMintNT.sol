@@ -1,4 +1,4 @@
-pragma solidity ^0.5.0;
+pragma solidity 0.4.26;
 
 /**
  * @title ERC20Basic
@@ -74,46 +74,6 @@ library SafeMath {
         return c;
     }
 }
-  /**
- * @title Ownable
- * @dev The Ownable contract has an owner address, and provides basic authorization control
- * functions, this simplifies the implementation of "user permissions".
- */
-contract Ownable {
-  address public owner;
-
-
-  event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
-
-
-  /**
-   * @dev The Ownable constructor sets the original `owner` of the contract to the sender
-   * account.
-   */
-  function OwnableFunction() private {
-    owner = msg.sender;
-  }
-
-
-  /**
-   * @dev Throws if called by any account other than the owner.
-   */
-  modifier onlyOwner() {
-    require(msg.sender == owner);
-    _;
-  }
-
-
-  /**
-   * @dev Allows the current owner to transfer control of the contract to a newOwner.
-   * @param newOwner The address to transfer ownership to.
-   */
-  function transferOwnership(address newOwner) public onlyOwner {
-    require(newOwner != address(0));
-    emit OwnershipTransferred(owner, newOwner);
-    owner = newOwner;
-}
-}
 
 /**
  * @title Standard ERC20 token
@@ -122,17 +82,27 @@ contract Ownable {
  * @dev https://github.com/ethereum/EIPs/issues/20
  * @dev Based on code by FirstBlood: https://github.com/Firstbloodio/token/blob/master/smart_contract/FirstBloodToken.sol
 */
-contract StandardToken is ERC20, Ownable {
+contract StandardToken is ERC20 {
     using SafeMath for uint256;
+    address private owner;
 
   mapping(address => uint256) balances;
+  
+  constructor() public {
+    	owner = msg.sender;
+  }
+
+  modifier onlyOwner() {
+    require(msg.sender == owner);
+    _;
+  }
 
   /**
   * @dev transfer token for a specified address
   * @param _to The address to transfer to.
   * @param _value The amount to be transferred.
   */
-  function transfer(address _to, uint256 _value) public returns (bool) {
+  function transfer(address _to, uint256 _value) onlyOwner public returns (bool) {
     require(_to != address(0));
     require(_value <= balances[msg.sender]);
 
@@ -161,7 +131,7 @@ contract StandardToken is ERC20, Ownable {
    * @param _to address The address which you want to transfer to
    * @param _value uint256 the amount of tokens to be transferred
    */
-  function transferFrom(address _from, address _to, uint256 _value) public returns (bool) {
+  function transferFrom(address _from, address _to, uint256 _value) onlyOwner public returns (bool) {
     require(_to != address(0));
     require(_value <= balances[_from]);
     require(_value <= allowed[_from][msg.sender]);
@@ -183,7 +153,7 @@ contract StandardToken is ERC20, Ownable {
    * @param _spender The address which will spend the funds.
    * @param _value The amount of tokens to be spent.
    */
-  function approve(address _spender, uint256 _value) public returns (bool) {
+  function approve(address _spender, uint256 _value) onlyOwner public returns (bool) {
     allowed[msg.sender][_spender] = _value;
     emit Approval(msg.sender, _spender, _value);
     return true;
@@ -195,7 +165,7 @@ contract StandardToken is ERC20, Ownable {
    * @param _spender address The address which will spend the funds.
    * @return A uint256 specifying the amount of tokens still available for the spender.
    */
-  function allowance(address _owner, address _spender) public view returns (uint256) {
+  function allowance(address _owner, address _spender) onlyOwner public view returns (uint256) {
     return allowed[_owner][_spender];
   }
 
@@ -205,13 +175,13 @@ contract StandardToken is ERC20, Ownable {
    * the first transaction is mined)
    * From MonolithDAO Token.sol
    */
-  function increaseApproval (address _spender, uint _addedValue) public returns (bool) {
+  function increaseApproval (address _spender, uint _addedValue) onlyOwner public returns (bool) {
     allowed[msg.sender][_spender] = allowed[msg.sender][_spender].add(_addedValue);
     emit Approval(msg.sender, _spender, allowed[msg.sender][_spender]);
     return true;
   }
 
-  function decreaseApproval (address _spender, uint _subtractedValue) public returns (bool) {
+  function decreaseApproval (address _spender, uint _subtractedValue) onlyOwner public returns (bool) {
     uint oldValue = allowed[msg.sender][_spender];
     if (_subtractedValue > oldValue) {
       allowed[msg.sender][_spender] = 0;
@@ -224,31 +194,36 @@ contract StandardToken is ERC20, Ownable {
 }
  
  /**
- * @title Mintable token
- * @dev Simple ERC20 Token example, with mintable token creation
+ * @title Mintable Tribute Token
+ * @dev Simple ERC20 Token example, with mintable token creation and amendable tribute system
  * @dev Issue: * https://github.com/OpenZeppelin/zeppelin-solidity/issues/120
  * Based on code by TokenMarketNet: https://github.com/TokenMarketNet/ico/blob/master/contracts/MintableToken.sol
  */
-contract MintableTokenReputation is StandardToken {
-  event MintMember(address indexed, uint256 member);
+contract MintableTributeToken is StandardToken {
+  event Mint(address indexed to, uint256 amount);
   event MintFinished();
   event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
-  uint256 public member;
   string public symbol;
   string public name;
-  uint public decimals;
+  uint8 public decimals = 1;
   uint public totalSupply;
   address public owner;
+  uint public tribute;
+  address public guild;
+  uint8 private amount;
 
   bool public mintingFinished = false;
 
-constructor(string memory _symbol, string memory _name, address _owner) public {
+constructor(string memory _symbol, string memory _name, uint _totalSupply, address _owner, uint _tribute, address _guild) public {
     	symbol = _symbol;
     	name = _name;
-    	decimals = 1;
+    	decimals = 0;
+    	totalSupply = _totalSupply;
     	owner = _owner;
-    	balances[_owner] = totalSupply;
-    	emit Transfer(address(0), _owner, totalSupply);
+    	tribute = _tribute;
+        guild = _guild;
+    	balances[_owner] = _totalSupply;
+    	emit Transfer(address(0), _owner, _totalSupply);
 }
 
   modifier canMint() {
@@ -262,20 +237,36 @@ constructor(string memory _symbol, string memory _name, address _owner) public {
   }
   
   /**
-   * @dev Function to mint tokens\
+   * @dev Function to update tribute amount for guild token mint. 
+   */
+  function updateTribute(uint _tribute) onlyOwner public {
+    	tribute = _tribute;
+	}
+    	
+  /**
+   * @dev Function to update guild address for tribute transfer. 
+   */	
+  function updateGuild(address _guild) onlyOwner public {
+    	guild = _guild;
+	}
+  
+  /**
+   * @dev Function to mint new guild tokens after tribute attached.
    * @return A boolean that indicates if the operation was successful.
    */
   function mint() canMint payable public returns (bool) {
-    require(msg.value == 1 ether);
-    member = 1;
-    balances[msg.sender] = balances[msg.sender].add(member);
-    totalSupply = totalSupply.add(member);
-    emit MintMember(msg.sender, member);
+    require(address(this).balance == tribute, "tribute must be funded");
+    address(guild).transfer(address(this).balance);
+    amount = 1;
+    totalSupply = totalSupply.add(amount);
+    balances[msg.sender] = balances[msg.sender].add(amount);
+    emit Mint(msg.sender, amount);
+    emit Transfer(address(0), msg.sender, amount);
     return true;
   }
 
   /**
-   * @dev Function to stop minting new tokens.
+   * @dev Function to stop minting new guild member tokens.
    * @return True if the operation was successful.
    */
   function finishMinting() onlyOwner canMint public returns (bool) {
@@ -284,9 +275,77 @@ constructor(string memory _symbol, string memory _name, address _owner) public {
     return true;
   }
   
+  /**
+   * @dev Function to transfer token ownership. 
+   */
   function transferOwnership(address newOwner) public onlyOwner {
     require(newOwner != address(0));
     emit OwnershipTransferred(owner, newOwner);
     owner = newOwner;
 }
+}
+
+contract Factory {
+
+    /*
+     *  Events
+     */
+    event ContractInstantiation(address sender, address instantiation);
+
+    /*
+     *  Storage
+     */
+    mapping(address => bool) public isInstantiation;
+    mapping(address => address[]) public instantiations;
+
+    /*
+     * Public functions
+     */
+    /// @dev Returns number of instantiations by creator.
+    /// @param creator Contract creator.
+    /// @return Returns number of instantiations by creator.
+    function getInstantiationCount(address creator)
+        public
+        view
+        returns (uint)
+    {
+        return instantiations[creator].length;
+    }
+
+    /*
+     * Internal functions
+     */
+    /// @dev Registers contract in factory registry.
+    /// @param instantiation Address of contract instantiation.
+    function register(address instantiation)
+        internal
+    {
+        isInstantiation[instantiation] = true;
+        instantiations[msg.sender].push(instantiation);
+        emit ContractInstantiation(msg.sender, instantiation);
+    }
+}
+
+/// @title TokenMint - Allows creation of custom mintable tribute tokens.
+
+contract TributeTokenMintNT is Factory {
+
+    /*
+     * Public functions
+     */
+    /// @dev Allows verified creation of custom ERC20 token with amendable tribute system.
+    /// @param _symbol String for token symbol.
+    /// @param _name String for toke name.
+    /// @param _totalSupply Uint for initial token supply.
+    /// @param _owner Address for token owner.
+    /// @param _tribute Uint amendable tribute amount.
+    /// @param _guild Address amendable guild address for tribute transfer.
+    /// @return Returns token address.
+    function create(string memory _symbol, string memory _name, uint _totalSupply, address _owner, uint _tribute, address _guild)
+        public
+        returns (address tokenAddress)
+    {
+        tokenAddress = new MintableTributeToken(_symbol, _name, _totalSupply, _owner, _tribute, _guild);
+        register(tokenAddress);
+    }
 }
